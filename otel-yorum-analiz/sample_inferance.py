@@ -1,9 +1,9 @@
+from transformers import BertTokenizer, BertForSequenceClassification
 import torch
-from transformers import BertForSequenceClassification, BertTokenizer
 
 # Model ve tokenizer'ı yükle
-model = BertForSequenceClassification.from_pretrained("saved_model")
-tokenizer = BertTokenizer.from_pretrained("saved_model")
+model = BertForSequenceClassification.from_pretrained("otel-yorum-analiz/saved_model")
+tokenizer = BertTokenizer.from_pretrained("otel-yorum-analiz/saved_model")
 
 # Örnek yorum
 text = "The hotel room was clean and the staff were friendly."
@@ -17,4 +17,4 @@ with torch.no_grad():
     predicted_class = torch.argmax(outputs.logits).item()
 
 # Sonucu yazdır
-print(f"Tahmin edilen sınıf: {predicted_class}")
+print(f"Predicted class: {predicted_class}")
