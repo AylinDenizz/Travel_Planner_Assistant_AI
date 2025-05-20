@@ -1,0 +1,25 @@
+# Sanal ortam
+venv/
+.env/
+
+# Derlenmiş dosyalar
+__pycache__/
+*.pyc
+
+# Model çıktıları ve dataset
+saved_model/
+results/
+data/
+*.pt
+*.bin
+*.h5
+
+# Notebook çıktıları
+*.ipynb_checkpoints
+
+# Log dosyaları
+*.log
+
+# Geçici dosyalar
+*.tmp
+*.cache

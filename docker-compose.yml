@@ -1,17 +1,91 @@
-version: '3.9'
-services:
-  yorum-analiz:
-    build: ./otel_yorum_analiz
-    container_name: yorum_analiz_api
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./otel_yorum_analiz:/app
-    restart: always
 
-  backend:
-    build: ./travel-backend
-    container_name: travel_backend
-    ports:
-      - "8080:8080"
-    restart: always
+  import pandas as pd
+    import torch
+    from transformers import BertTokenizer, BertForSequenceClassification, TrainingArguments, Trainer
+    from datasets import Dataset
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+    
+    # Cihaz kontrolü
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Model ve Tokenizer
+    model_name = "bert-base-uncased"
+    tokenizer = BertTokenizer.from_pretrained(model_name)
+    
+    # Veriyi Yükle
+    df = pd.read_csv("data\cleaned_reviews_limited.csv")
+
+  print(f"❗ Problemli satır sayısı: {len(df)}")
+
+# Veri setini Datasets formatına dönüştür
+dataset = Dataset.from_pandas(df[['Cleaned_Review', 'Reviewer_Score']])
+
+# Veriyi train/test olarak ayır
+dataset = dataset.train_test_split(test_size=0.2)
+train_dataset = dataset['train']
+val_dataset = dataset['test']
+
+# Tokenize etme fonksiyonu
+def tokenize_function(example):
+    review = example.get("Cleaned_Review", "")
+                                      if isinstance(review, str):
+                                        return tokenizer(example["Cleaned_Review"], padding="max_length", truncation=True, max_length=256)
+                                      else:
+                                        print(f"Geçersiz veri: {review}")
+        return {"input_ids": [], "attention_mask": []}
+
+
+  # Veriyi tokenize et
+    train_dataset = train_dataset.map(tokenize_function, batched=True)
+    val_dataset = val_dataset.map(tokenize_function, batched=True)
+    
+    # Etiket sütununu "labels" olarak değiştir
+    train_dataset = train_dataset.rename_column("Reviewer_Score", "labels")
+    val_dataset = val_dataset.rename_column("Reviewer_Score", "labels")
+    
+    train_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+    val_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+    
+    # Modeli yükle
+    model = BertForSequenceClassification.from_pretrained(model_name, num_labels=1)
+    model.to(device)
+
+  # Değerlendirme metrikleri
+  def compute_metrics(p):
+    preds = p.predictions.squeeze()
+    labels = p.label_ids
+    return {
+    "mae": (torch.abs(preds - labels)).mean().item(),
+    "mse": (torch.square(preds - labels)).mean().item(),
+  }
+
+  # Eğitim parametreleri
+    training_args = TrainingArguments(
+    output_dir="./results",
+    evaluation_strategy="epoch",
+    save_strategy="epoch",
+    num_train_epochs=3,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    logging_dir="./logs",
+    logging_steps=10,
+    report_to="none",
+    )
+    
+    # Trainer nesnesi
+    trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_dataset,
+    eval_dataset=val_dataset,
+    compute_metrics=compute_metrics,
+    )
+    
+    # Eğitimi başlat
+    trainer.train()
+    
+    # Modeli kaydet
+    model.save_pretrained("saved_model")
+    tokenizer.save_pretrained("saved_model")
+    
+    print("Model eğitimi tamamlandı ve kaydedildi!")
